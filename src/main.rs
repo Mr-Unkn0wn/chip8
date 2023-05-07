@@ -8,9 +8,10 @@ mod interface;
 fn window_conf() -> Conf {
     Conf {
         window_title: "Chip8".to_string(),
+        window_resizable: true,
         fullscreen: false,
-        window_width: (DISPLAY_WIDTH * 10) as i32,
-        window_height: (DISPLAY_HEIGHT * 10) as i32,
+        window_width: (DISPLAY_WIDTH * 10) as i32 + 200,
+        window_height: (DISPLAY_HEIGHT * 10) as i32 + 200,
         ..Default::default()
     }
 }
@@ -23,7 +24,10 @@ async fn main() {
     let mut interface = Interface::new();
 
     loop {
-        chip8.step();
+        if !interface.debug || interface.manual_step {
+            chip8.step();
+            interface.manual_step = false;
+        }
         interface.draw_gui(&chip8);
         next_frame().await
     }

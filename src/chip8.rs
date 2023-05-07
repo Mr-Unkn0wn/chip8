@@ -19,7 +19,7 @@ const REG_SIZE: usize = 16;
 #[derive(derive_getters::Getters)]
 pub struct Chip8 {
     memory: [u8; MEM_SIZE],
-    display: [bool; DISPLAY_WIDTH * DISPLAY_HEIGHT],
+    display: [[bool; DISPLAY_HEIGHT]; DISPLAY_WIDTH],
     program_counter: usize,
     index: usize,
     stack: Vec<u16>,
@@ -41,7 +41,7 @@ impl Chip8 {
     pub fn new(rom: &[u8]) -> Chip8 {
         let mut chip = Chip8 {
             memory: [0; MEM_SIZE],
-            display: [false; DISPLAY_WIDTH * DISPLAY_HEIGHT],
+            display: [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH],
             program_counter: 0x200,
             index: 0,
             stack: vec![],
@@ -126,8 +126,10 @@ impl Chip8 {
 
     //00E0
     fn clear_screen(&mut self) {
-        for i in 0..self.display.len() {
-            self.display[i] = false;
+        for x in 0..DISPLAY_WIDTH {
+            for y in 0..DISPLAY_HEIGHT {
+                self.display[x][y] = false;
+            }
         }
     }
 
@@ -183,14 +185,13 @@ impl Chip8 {
                 };
 
                 if bit {
-                    self.display[y_iter * DISPLAY_HEIGHT + x_iter] =
-                        match self.display[y_iter * DISPLAY_HEIGHT + x_iter] {
-                            true => {
-                                self.register[0xF] = 1;
-                                false
-                            }
-                            false => true,
-                        };
+                    self.display[x_iter][y_iter] = match self.display[x_iter][y_iter] {
+                        true => {
+                            self.register[0xF] = 1;
+                            false
+                        }
+                        false => true,
+                    };
                 }
 
                 x_iter += 1;
