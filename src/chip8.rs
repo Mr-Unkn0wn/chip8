@@ -99,20 +99,31 @@ impl Chip8 {
             0x0 => match decoded_instruction.nn {
                 0xE0 => self.clear_screen(),
                 0xEE => self.return_method(),
-                _ => panic!(),
+                _ => (),
             },
             0x1 => self.jump(decoded_instruction),
-            0x2 => (),
-            0x3 => (),
-            0x4 => (),
-            0x5 => (),
+            0x2 => self.call(decoded_instruction),
+            0x3 => self.skip_register_equal_nn(decoded_instruction),
+            0x4 => self.skip_register_not_equal_nn(decoded_instruction),
+            0x5 => self.skip_registers_equal(decoded_instruction),
             0x6 => self.set_register(decoded_instruction),
             0x7 => self.add(decoded_instruction),
-            0x8 => (),
-            0x9 => (),
+            0x8 => match decoded_instruction.n {
+                0x0 => self.set(decoded_instruction),
+                0x1 => self.or(decoded_instruction),
+                0x2 => self.and(decoded_instruction),
+                0x3 => self.xor(decoded_instruction),
+                0x4 => self.add_register(decoded_instruction),
+                0x5 => self.sub_register(decoded_instruction),
+                0x6 => self.shift_left(decoded_instruction),
+                0x7 => self.sub_register_reversed(decoded_instruction),
+                0xE => self.shift_right(decoded_instruction),
+                _ => panic!(),
+            },
+            0x9 => self.skip_registers_not_equal(decoded_instruction),
             0xA => self.set_index(decoded_instruction),
-            0xB => (),
-            0xC => (),
+            0xB => self.jump_offset(decoded_instruction),
+            0xC => self.random(decoded_instruction),
             0xD => self.set_display(decoded_instruction),
             0xE => (),
             0xF => (),
@@ -134,11 +145,47 @@ impl Chip8 {
     }
 
     //00EE
-    fn return_method(&mut self) {}
+    fn return_method(&mut self) {
+        self.program_counter = self.stack.pop().unwrap() as usize;
+    }
 
     //1NNN
     fn jump(&mut self, decoded_instruction: &Decode) {
         self.program_counter = decoded_instruction.nnn;
+    }
+
+    //2NNN
+    fn call(&mut self, decoded_instruction: &Decode) {
+        self.stack.push(self.program_counter as u16);
+        self.program_counter = decoded_instruction.nnn;
+    }
+
+    //3XNN
+    fn skip_register_equal_nn(&mut self, decoded_instruction: &Decode) {
+        let x = self.register[decoded_instruction.x as usize];
+
+        if x == decoded_instruction.nn {
+            self.program_counter += 2;
+        }
+    }
+
+    //4XNN
+    fn skip_register_not_equal_nn(&mut self, decoded_instruction: &Decode) {
+        let x = self.register[decoded_instruction.x as usize];
+
+        if x != decoded_instruction.nn {
+            self.program_counter += 2;
+        }
+    }
+
+    //5XY0
+    fn skip_registers_equal(&mut self, decoded_instruction: &Decode) {
+        let x = self.register[decoded_instruction.x as usize];
+        let y = self.register[decoded_instruction.y as usize];
+
+        if x == y {
+            self.program_counter += 2;
+        }
     }
 
     //6XNN
@@ -151,9 +198,123 @@ impl Chip8 {
         self.register[decoded_instruction.x as usize] += decoded_instruction.nn;
     }
 
+    //8XY0
+    fn set(&mut self, decoded_instruction: &Decode) {
+        let y = self.register[decoded_instruction.y as usize];
+        self.register[decoded_instruction.x as usize] = y;
+    }
+
+    //8XY1
+    fn or(&mut self, decoded_instruction: &Decode) {
+        let x = self.register[decoded_instruction.x as usize];
+        let y = self.register[decoded_instruction.y as usize];
+        self.register[decoded_instruction.x as usize] = x | y;
+    }
+
+    //8XY2
+    fn and(&mut self, decoded_instruction: &Decode) {
+        let x = self.register[decoded_instruction.x as usize];
+        let y = self.register[decoded_instruction.y as usize];
+        self.register[decoded_instruction.x as usize] = x & y;
+    }
+
+    //8XY3
+    fn xor(&mut self, decoded_instruction: &Decode) {
+        let x = self.register[decoded_instruction.x as usize];
+        let y = self.register[decoded_instruction.y as usize];
+        self.register[decoded_instruction.x as usize] = x ^ y;
+    }
+
+    //8XY4
+    fn add_register(&mut self, decoded_instruction: &Decode) {
+        let x = self.register[decoded_instruction.x as usize];
+        let y = self.register[decoded_instruction.y as usize];
+
+        let result: u16 = x as u16 + y as u16;
+
+        if result > 255 {
+            self.register[0xF] = 1;
+        } else {
+            self.register[0xF] = 0;
+        }
+
+        self.register[decoded_instruction.x as usize] = x.wrapping_add(y);
+    }
+
+    //8XY5
+    fn sub_register(&mut self, decoded_instruction: &Decode) {
+        let x = self.register[decoded_instruction.x as usize];
+        let y = self.register[decoded_instruction.y as usize];
+
+        if x > y {
+            self.register[0xF] = 1;
+        } else {
+            self.register[0xF] = 0;
+        }
+
+        self.register[decoded_instruction.x as usize] = x.wrapping_sub(y);
+    }
+
+    //8XY5
+    fn shift_right(&mut self, decoded_instruction: &Decode) {
+        let x = self.register[decoded_instruction.x as usize];
+
+        let bit = x & 0b0000_0001;
+
+        self.register[0xF] = bit;
+
+        self.register[decoded_instruction.x as usize] = x >> 1;
+    }
+
+    //8XY7
+    fn sub_register_reversed(&mut self, decoded_instruction: &Decode) {
+        let x = self.register[decoded_instruction.x as usize];
+        let y = self.register[decoded_instruction.y as usize];
+
+        if y > x {
+            self.register[0xF] = 1;
+        } else {
+            self.register[0xF] = 0;
+        }
+
+        self.register[decoded_instruction.x as usize] = y.wrapping_sub(x);
+    }
+
+    //8XYE
+    fn shift_left(&mut self, decoded_instruction: &Decode) {
+        let x = self.register[decoded_instruction.x as usize];
+
+        let bit = x & 0b1000_0000;
+
+        self.register[0xF] = bit;
+
+        self.register[decoded_instruction.x as usize] = x << 1;
+    }
+
+    //9XY0
+    fn skip_registers_not_equal(&mut self, decoded_instruction: &Decode) {
+        let x = self.register[decoded_instruction.x as usize];
+        let y = self.register[decoded_instruction.y as usize];
+
+        if x != y {
+            self.program_counter += 2;
+        }
+    }
+
     //ANNN
     fn set_index(&mut self, decoded_instruction: &Decode) {
         self.index = decoded_instruction.nnn;
+    }
+
+    //BNNN
+    fn jump_offset(&mut self, decoded_instruction: &Decode) {
+        self.program_counter = decoded_instruction.nnn + self.register[0] as usize;
+    }
+
+    //CXNN
+    fn random(&mut self, decoded_instruction: &Decode) {
+        let random: u8 = rand::random();
+        self.register[decoded_instruction.x as usize] = random & decoded_instruction.nn;
     }
 
     //DXYN
