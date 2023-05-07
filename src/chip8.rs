@@ -50,8 +50,8 @@ impl Chip8 {
             register: [0; REG_SIZE],
         };
 
-        for i in 0..rom.len() {
-            chip.memory[i + chip.program_counter] = rom[i];
+        for (i, byte) in rom.iter().enumerate() {
+            chip.memory[i + chip.program_counter] = *byte;
         }
 
         chip
@@ -101,19 +101,19 @@ impl Chip8 {
                 0xEE => self.return_method(),
                 _ => panic!(),
             },
-            0x1 => self.jump(&decoded_instruction),
+            0x1 => self.jump(decoded_instruction),
             0x2 => (),
             0x3 => (),
             0x4 => (),
             0x5 => (),
-            0x6 => self.set_register(&decoded_instruction),
-            0x7 => self.add(&decoded_instruction),
+            0x6 => self.set_register(decoded_instruction),
+            0x7 => self.add(decoded_instruction),
             0x8 => (),
             0x9 => (),
-            0xA => self.set_index(&decoded_instruction),
+            0xA => self.set_index(decoded_instruction),
             0xB => (),
             0xC => (),
-            0xD => self.set_display(&decoded_instruction),
+            0xD => self.set_display(decoded_instruction),
             0xE => (),
             0xF => (),
             _ => panic!("First nibble of instruction was bigger then 4 bits can handle."),

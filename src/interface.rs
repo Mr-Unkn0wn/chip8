@@ -1,7 +1,7 @@
 use egui::*;
 use macroquad::prelude::*;
 
-use crate::chip8::{Chip8, DISPLAY_HEIGHT, DISPLAY_WIDTH};
+use crate::chip8::Chip8;
 
 pub struct Interface {
     pixel_scaling: u16,
@@ -30,11 +30,9 @@ impl Interface {
     fn draw_chip_display(&mut self, chip8: &Chip8) {
         let display = chip8.display();
 
-        for x in 0..DISPLAY_WIDTH {
-            for y in 0..DISPLAY_HEIGHT {
-                let white = display[x][y];
-
-                let color = match white {
+        for (x, col) in display.iter().enumerate() {
+            for (y, value) in col.iter().enumerate() {
+                let color = match value {
                     true => WHITE,
                     false => BLACK,
                 };
